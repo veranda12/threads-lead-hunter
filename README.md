@@ -59,6 +59,7 @@ Database test terpisah dipakai oleh `npm test` (`TEST_DATABASE_URL`). Docker Com
 - [Database](docs/DATABASE.md)
 - [Aturan bisnis](docs/BUSINESS_RULES.md)
 - [Setup Threads API dan Meta App Review](docs/THREADS_API_SETUP.md)
+- [Materi pengajuan App Review](docs/APP_REVIEW.md)
 - [Pipeline AI](docs/AI_PIPELINE.md)
 - [AI lokal dengan Ollama](docs/LOCAL_AI.md)
 - [Scheduler](docs/SCHEDULER.md)
