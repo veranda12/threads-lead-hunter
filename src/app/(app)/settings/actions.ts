@@ -195,6 +195,7 @@ export type TestSearchState =
   | {
       ok: boolean;
       message: string;
+      keyword?: string;
       results?: { username: string | null; text: string; timestamp: string | null; permalink: string | null }[];
     }
   | undefined;
@@ -230,6 +231,7 @@ export async function testKeywordSearchAction(_p: TestSearchState, fd: FormData)
     await audit({ action: "threads.keyword_search_test", actorId: user.id, metadata: { keyword: parsed.data, results: page.posts.length } });
     return {
       ok: true,
+      keyword: parsed.data,
       message: `Berhasil: Threads API mengembalikan ${page.posts.length} postingan untuk "${parsed.data}" (30 hari terakhir).`,
       results: page.posts.map((p) => ({
         username: p.username,
@@ -244,6 +246,6 @@ export async function testKeywordSearchAction(_p: TestSearchState, fd: FormData)
       data: { provider: "THREADS", operation: "keyword_search_test", statusCode: pe.options.httpStatus ?? null, success: false, error: pe.message.slice(0, 500), durationMs: Date.now() - started },
     });
     await recordProviderError(pe, now);
-    return { ok: false, message: `${PROVIDER_STATUS_LABELS[statusFromErrorCode(pe.code)]}: ${pe.message}` };
+    return { ok: false, keyword: parsed.data, message: `${PROVIDER_STATUS_LABELS[statusFromErrorCode(pe.code)]}: ${pe.message}` };
   }
 }

@@ -11,8 +11,26 @@ Materi pengajuan untuk app **Threads Lead Hunter** (Meta app ID `113286927908490
 - [x] Privacy Policy publik lengkap: https://threads-lead-hunter-five.vercel.app/privacy-policy
 - [x] Instruksi penghapusan data: https://threads-lead-hunter-five.vercel.app/data-deletion
 - [ ] Kolom **API Calls** untuk `threads_keyword_search` di Meta sudah > 0 (bisa butuh hingga ~24 jam setelah panggilan pertama)
-- [ ] Screencast direkam (naskah di bawah)
-- [ ] **App settings → Basic**: Privacy Policy URL, kategori, dan ikon app terisi
+- [x] Screencast direkam: `logs/app-review/threads-lead-hunter-app-review.mp4`
+- [x] **App settings → Basic**: Privacy Policy URL, domain, URL penghapusan data, kategori, dan ikon app terisi
+
+## Screencast otomatis
+
+Video sudah direkam otomatis dari aplikasi production dengan Playwright, dengan keterangan bahasa Inggris di setiap adegan: `logs/app-review/threads-lead-hunter-app-review.mp4` (17 Okt 2026, 1:57, H.264 1280x720). Folder `logs/` tidak di-commit.
+
+Rekam ulang (mis. setelah UI berubah):
+
+```bash
+npx tsx --conditions=react-server .secrets/screencast-prep.ts post      # ambil postingan penguji via API
+npx tsx --conditions=react-server .secrets/screencast-prep.ts session   # sesi sementara 90 menit, tanpa password
+npx tsx scripts/record-app-review.ts part-a                             # login, OAuth, keyword search, import
+npm run worker:analyze                                                  # analisis di laptop (di luar rekaman)
+npx tsx scripts/record-app-review.ts part-b                             # hasil analisis, privacy, penghapusan data
+npx tsx --conditions=react-server .secrets/screencast-prep.ts revoke    # cabut sesi sementara
+# gabungkan ke MP4: ffmpeg -i part-a.webm -i part-b.webm -filter_complex concat ... (lihat riwayat sesi)
+```
+
+Postingan yang diimpor di video adalah postingan penguji sendiri; hapus dulu lead-nya bila merekam ulang (import kedua ditolak sebagai duplikat).
 
 ## Naskah screencast (2-3 menit)
 

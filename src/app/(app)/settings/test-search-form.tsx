@@ -17,7 +17,8 @@ export function TestSearchForm({ approved }: { approved: boolean }) {
           <label htmlFor="test-keyword" className="field-label">
             Keyword
           </label>
-          <input id="test-keyword" name="keyword" defaultValue="website" required maxLength={100} className="input" />
+          {/* key memaksa input memakai keyword terakhir setelah form di-reset oleh React */}
+          <input key={state?.keyword ?? "default"} id="test-keyword" name="keyword" defaultValue={state?.keyword ?? "website"} required maxLength={100} className="input" />
         </div>
         <button type="submit" className="btn btn-secondary" disabled={pending} aria-busy={pending}>
           {pending ? "Mencari..." : "Jalankan uji"}
