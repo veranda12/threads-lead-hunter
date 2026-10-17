@@ -157,7 +157,9 @@ export default async function AutomationPage({ searchParams }: PageProps<"/autom
                   </>
                 ),
               },
-              { label: "Token Claude hari ini", value: <span className="tabular">{tokens.toLocaleString("id-ID")} / {ai.dailyTokenBudget.toLocaleString("id-ID")}</span> },
+              aiStatus.runtime.provider === "ollama"
+                ? { label: "Token Claude hari ini", value: <span className="text-muted">Tidak dipakai, analisis berjalan di Ollama lokal (gratis)</span> }
+                : { label: "Token Claude hari ini", value: <span className="tabular">{tokens.toLocaleString("id-ID")} / {ai.dailyTokenBudget.toLocaleString("id-ID")}</span> },
             ]}
           />
         </section>

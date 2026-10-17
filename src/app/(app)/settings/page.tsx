@@ -202,21 +202,29 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
                 hint="Bukan permintaan jasa dan relevansi di bawah ini berhenti di triage"
               />
             </div>
-            <div className="max-w-sm">
-              <label htmlFor="model" className="field-label">
-                Model Claude
-              </label>
-              <select id="model" name="model" defaultValue={ai.model} className="input">
-                {AI_MODELS.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.label} (${m.inputPerMTok} / ${m.outputPerMTok} per 1 juta token)
-                  </option>
-                ))}
-              </select>
-              <p className="field-hint">Nama model disimpan di setiap analisis sebagai modelVersion.</p>
-            </div>
+            {/* Field Claude hanya dipakai provider anthropic. Saat Ollama aktif dilipat (tetap ikut tersimpan). */}
+            <details open={ai.provider === "anthropic"} className="rounded-md border border-line p-4">
+              <summary className="cursor-pointer text-sm font-medium text-ink">
+                Claude API (berbayar){ai.provider === "ollama" ? " · tidak dipakai selama Ollama lokal aktif" : ""}
+              </summary>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="model" className="field-label">
+                    Model Claude
+                  </label>
+                  <select id="model" name="model" defaultValue={ai.model} className="input">
+                    {AI_MODELS.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label} (${m.inputPerMTok} / ${m.outputPerMTok} per 1 juta token)
+                      </option>
+                    ))}
+                  </select>
+                  <p className="field-hint">Nama model disimpan di setiap analisis sebagai modelVersion.</p>
+                </div>
+                <NumberField name="dailyTokenBudget" label="Budget token Claude harian" value={ai.dailyTokenBudget} min={0} max={100_000_000} hint="Input + output, reset 00.00 WIB" />
+              </div>
+            </details>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <NumberField name="dailyTokenBudget" label="Budget token Claude harian" value={ai.dailyTokenBudget} min={0} max={100_000_000} hint="Input + output, reset 00.00 WIB" />
               <NumberField name="maxAnalysesPerRun" label="Maks analisis per run" value={ai.maxAnalysesPerRun} min={0} max={500} />
               <NumberField name="minLeadScoreForDrafts" label="Skor minimal untuk draft DM" value={ai.minLeadScoreForDrafts} min={0} max={100} />
               <NumberField name="prefilterThreshold" label="Ambang pre-filter" value={ai.prefilterThreshold} min={0} max={100} hint="Di bawah ini tidak dikirim ke AI" />
@@ -243,7 +251,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
         <section id="profil" aria-labelledby="profil-h" className="scroll-mt-6">
           <SectionTitle id="profil-h">Profil untuk draft DM</SectionTitle>
           <ActionForm action={saveProfileAction} className="panel space-y-4 p-5">
-            <p className="text-sm text-muted">Claude hanya boleh memakai fakta dari sini. Jangan masukkan klaim yang tidak bisa Anda buktikan.</p>
+            <p className="text-sm text-muted">AI hanya boleh memakai fakta dari sini. Jangan masukkan klaim yang tidak bisa Anda buktikan.</p>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label htmlFor="displayName" className="field-label">
