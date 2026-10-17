@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Threads Lead Hunter
 
-## Getting Started
+Dashboard internal untuk menemukan postingan Threads terbaru dari orang yang butuh jasa website atau software, menilainya dengan Claude, dan menyiapkan draft DM yang Anda kirim sendiri. Satu pengguna, data nyata dari database, tanpa pengiriman pesan otomatis.
 
-First, run the development server:
+## Status fitur
+
+| Bagian | Status |
+|---|---|
+| Login, sesi, rate limit login, audit log append-only | Berfungsi |
+| Import postingan manual (URL + teks) | Berfungsi tanpa credential eksternal |
+| Freshness 6 jam, dedup, pre-filter, pipeline discovery, lock, idempotency, retry | Berfungsi, teruji |
+| Threads Keyword Search (API resmi) | Kode siap. Butuh Meta App, OAuth, dan approval `threads_keyword_search` |
+| Analisis lead + 3 draft DM | Dua provider: Claude API (butuh `ANTHROPIC_API_KEY`) atau Ollama lokal lewat worker di laptop ([LOCAL_AI.md](docs/LOCAL_AI.md)) |
+| CRM: status, Kanban/tabel, catatan, follow-up, timeline | Berfungsi |
+| Harga layanan, keyword, pengaturan, analitik | Berfungsi |
+| Privacy Policy publik, formulir hapus data, callback Meta | Berfungsi. Isian pengelola perlu dilengkapi |
+| Scheduler GitHub Actions | Workflow siap. Butuh secret `APP_URL` dan `CRON_SECRET` |
+
+## Menjalankan lokal
+
+Prasyarat: Node.js 20.19+ (CI memakai 22), npm, PostgreSQL 15+ (lokal atau `docker compose up -d`).
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env          # isi DATABASE_URL, ADMIN_EMAIL, ADMIN_PASSWORD, ENCRYPTION_KEY, CRON_SECRET
+npm run db:deploy             # terapkan migration
+npm run db:seed               # katalog layanan, 21 keyword awal, akun admin
+npm run dev                   # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Membuat secret:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"   # ENCRYPTION_KEY
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"      # CRON_SECRET
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Database test terpisah dipakai oleh `npm test` (`TEST_DATABASE_URL`). Docker Compose membuat keduanya otomatis.
 
-## Learn More
+## Script
 
-To learn more about Next.js, take a look at the following resources:
+| Perintah | Fungsi |
+|---|---|
+| `npm run dev` / `build` / `start` | Next.js |
+| `npm run typecheck` | `next typegen` + `tsc --noEmit` |
+| `npm run lint` | ESLint |
+| `npm test` | Vitest: unit + integration (PostgreSQL test DB) |
+| `npm run test:e2e` | Playwright smoke test terhadap build produksi (`npm run build` dulu) |
+| `npm run db:migrate` | Buat migration baru saat schema berubah |
+| `npm run db:deploy` | Terapkan migration (lokal/produksi) |
+| `npm run db:seed` | Seed idempotent. `-- --reset-admin-password` untuk reset password admin |
+| `npm run worker:discovery` | Jalankan satu discovery run langsung (tanpa HTTP) |
+| `npm run worker:analyze` | Worker AI lokal: analisis kandidat pending dengan Ollama (env dari `.secrets/worker.env`) |
+| `DEMO_MODE=true npm run demo:seed` / `npm run demo:clear` | Fixture demo bertanda `DEMO_FIXTURE`, hanya lokal |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Dokumentasi
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [Arsitektur](docs/ARCHITECTURE.md)
+- [Database](docs/DATABASE.md)
+- [Aturan bisnis](docs/BUSINESS_RULES.md)
+- [Setup Threads API dan Meta App Review](docs/THREADS_API_SETUP.md)
+- [Pipeline AI](docs/AI_PIPELINE.md)
+- [AI lokal dengan Ollama](docs/LOCAL_AI.md)
+- [Scheduler](docs/SCHEDULER.md)
+- [Deployment](docs/DEPLOYMENT.md)
+- [Keamanan](docs/SECURITY.md)
+- [Privasi dan penghapusan data](docs/PRIVACY_AND_DATA_DELETION.md)
+- [Troubleshooting](docs/TROUBLESHOOTING.md)

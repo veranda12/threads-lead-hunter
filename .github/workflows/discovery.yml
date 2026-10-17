@@ -1,0 +1,46 @@
+name: Discovery scheduler
+
+on:
+  schedule:
+    # Setiap 30 menit (UTC). GitHub dapat menunda jadwal beberapa menit saat beban tinggi;
+    # pipeline selalu menghitung cutoff 6 jam dari waktu eksekusi aktual di server.
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: discovery
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Call discovery endpoint
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          EXECUTION_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "::error::Secret APP_URL dan CRON_SECRET wajib diisi di repository settings"
+            exit 1
+          fi
+          # Idempotency key run_id-run_attempt: retry di bawah tidak menjalankan discovery dua kali.
+          for attempt in 1 2 3; do
+            status=$(curl -sS -o response.json -w "%{http_code}" -X POST \
+              --max-time 320 \
+              -H "Authorization: Bearer ${CRON_SECRET}" \
+              -H "X-Execution-Id: ${EXECUTION_ID}" \
+              "${APP_URL%/}/api/internal/discovery/run" || echo "000")
+            echo "HTTP ${status}"
+            head -c 2000 response.json 2>/dev/null || true
+            echo
+            if [ "$status" = "200" ]; then exit 0; fi
+            if [ "$status" = "401" ] || [ "$status" = "400" ]; then exit 1; fi
+            sleep $((attempt * 20))
+          done
+          exit 1

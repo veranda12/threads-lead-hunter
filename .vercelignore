@@ -1,0 +1,12 @@
+# Jangan pernah upload secret lokal atau artefak build/test ke Vercel.
+.env
+.env.*
+!.env.example
+node_modules
+.next
+src/generated
+test-results
+playwright-report
+tsconfig.tsbuildinfo
+.secrets
+logs

@@ -1,0 +1,607 @@
+// Threads Lead Hunter - database schema
+// Semua timestamp disimpan dalam UTC (timestamptz). Tampilan dikonversi ke Asia/Jakarta.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------
+
+enum LeadStatus {
+  NEW
+  REVIEWED
+  CONTACTED
+  REPLIED
+  QUALIFIED
+  PROPOSAL_SENT
+  NEGOTIATION
+  WON
+  LOST
+  ARCHIVED
+}
+
+enum Freshness {
+  FRESH
+  EXPIRED
+  UNKNOWN
+}
+
+enum LeadSource {
+  OFFICIAL_THREADS
+  MANUAL_IMPORT
+  DEMO_FIXTURE
+}
+
+enum LeadIntent {
+  SERVICE_REQUEST
+  VENDOR_RECOMMENDATION
+  PRICE_INQUIRY
+  PARTNER_SEARCH
+  JOB_VACANCY
+  SELF_PROMOTION
+  PROMOTION
+  GENERAL_DISCUSSION
+  SPAM
+  IRRELEVANT
+}
+
+enum LeadPriority {
+  HIGH
+  MEDIUM
+  LOW
+  IGNORE
+}
+
+enum AnalysisStatus {
+  PENDING
+  PREFILTERED_OUT
+  ANALYZED
+  FAILED
+  BUDGET_EXCEEDED
+  NOT_CONFIGURED
+}
+
+enum ProviderKind {
+  OFFICIAL_THREADS
+  MANUAL
+}
+
+enum IntegrationStatus {
+  CONNECTED
+  PERMISSION_REQUIRED
+  TOKEN_EXPIRED
+  RATE_LIMITED
+  PROVIDER_ERROR
+  NOT_CONFIGURED
+}
+
+enum RunStatus {
+  RUNNING
+  SUCCEEDED
+  PARTIAL
+  FAILED
+  SKIPPED_LOCKED
+  SKIPPED_DISABLED
+  SKIPPED_INTERVAL
+}
+
+enum RunTrigger {
+  SCHEDULER
+  MANUAL
+  WORKER
+  // Worker analisis AI lokal (Ollama di laptop pengelola); tidak melakukan pencarian.
+  LOCAL_AI
+}
+
+enum RunItemOutcome {
+  NEW_LEAD
+  UPDATED_CONTENT
+  DUPLICATE
+  STALE
+  INVALID_TIMESTAMP
+  FUTURE_TIMESTAMP
+  SUPPRESSED
+  ERROR
+}
+
+enum KeywordCategory {
+  WEBSITE
+  ENTERPRISE_SOFTWARE
+  GENERAL
+  TECHNICAL
+}
+
+enum DraftTone {
+  FRIENDLY
+  PROFESSIONAL
+  CONSULTATIVE
+}
+
+enum DraftSource {
+  AI
+  MANUAL
+}
+
+enum PricingType {
+  FIXED
+  STARTING_FROM
+  MONTHLY
+  CUSTOM_QUOTE
+}
+
+enum ActivityType {
+  DISCOVERED
+  IMPORTED
+  ANALYZED
+  STATUS_CHANGED
+  NOTE_ADDED
+  DRAFT_GENERATED
+  DRAFT_EDITED
+  DRAFT_FAVORITED
+  CONTACTED
+  FOLLOW_UP_SET
+  CONTENT_UPDATED
+}
+
+enum UsageProvider {
+  THREADS
+  ANTHROPIC
+  OLLAMA
+}
+
+enum DeletionRequestSource {
+  META_CALLBACK
+  WEB_FORM
+}
+
+enum DeletionRequestStatus {
+  RECEIVED
+  COMPLETED
+  REJECTED
+}
+
+// ---------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------
+
+model User {
+  id               String    @id @default(cuid())
+  email            String    @unique
+  name             String
+  passwordHash     String
+  failedLoginCount Int       @default(0)
+  lockedUntil      DateTime? @db.Timestamptz(3)
+  lastLoginAt      DateTime? @db.Timestamptz(3)
+  createdAt        DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime  @updatedAt @db.Timestamptz(3)
+
+  sessions UserSession[]
+  notes    LeadNote[]
+}
+
+model UserSession {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+  lastSeenAt DateTime  @default(now()) @db.Timestamptz(3)
+  expiresAt  DateTime  @db.Timestamptz(3)
+  revokedAt  DateTime? @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model RateLimitBucket {
+  key         String   @id
+  count       Int      @default(0)
+  windowStart DateTime @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+}
+
+// ---------------------------------------------------------------
+// Integrations & providers
+// ---------------------------------------------------------------
+
+model IntegrationAccount {
+  id               String            @id @default(cuid())
+  provider         ProviderKind      @unique
+  externalUserId   String?
+  username         String?
+  // AES-256-GCM ciphertext (lihat src/lib/crypto.ts). Tidak pernah dikirim ke client.
+  accessTokenEnc   String?
+  tokenIssuedAt    DateTime?         @db.Timestamptz(3)
+  tokenExpiresAt   DateTime?         @db.Timestamptz(3)
+  scopes           String[]
+  status           IntegrationStatus @default(NOT_CONFIGURED)
+  statusMessage    String?
+  lastCheckedAt    DateTime?         @db.Timestamptz(3)
+  lastRefreshedAt  DateTime?         @db.Timestamptz(3)
+  createdAt        DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime          @updatedAt @db.Timestamptz(3)
+}
+
+model SearchProvider {
+  id                 String            @id @default(cuid())
+  kind               ProviderKind      @unique
+  name               String
+  enabled            Boolean           @default(true)
+  status             IntegrationStatus @default(NOT_CONFIGURED)
+  statusMessage      String?
+  dailyRequestBudget Int               @default(1500)
+  rateLimitedUntil   DateTime?         @db.Timestamptz(3)
+  lastSuccessAt      DateTime?         @db.Timestamptz(3)
+  lastErrorAt        DateTime?         @db.Timestamptz(3)
+  lastError          String?
+  createdAt          DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime          @updatedAt @db.Timestamptz(3)
+}
+
+model SearchKeyword {
+  id             String          @id @default(cuid())
+  phrase         String          @unique
+  category       KeywordCategory
+  enabled        Boolean         @default(true)
+  lastSearchedAt DateTime?       @db.Timestamptz(3)
+  searchCount    Int             @default(0)
+  totalResults   Int             @default(0)
+  leadsFound     Int             @default(0)
+  qualifiedLeads Int             @default(0)
+  errorCount     Int             @default(0)
+  lastError      String?
+  createdAt      DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime        @updatedAt @db.Timestamptz(3)
+
+  leads    Lead[]
+  runItems DiscoveryRunItem[]
+
+  @@index([enabled, lastSearchedAt])
+}
+
+// ---------------------------------------------------------------
+// Discovery
+// ---------------------------------------------------------------
+
+model DiscoveryRun {
+  id                String     @id @default(cuid())
+  // Idempotency key dari caller (mis. GitHub run id). Satu eksekusi = satu baris.
+  executionId       String     @unique
+  trigger           RunTrigger
+  status            RunStatus  @default(RUNNING)
+  serverNow         DateTime   @db.Timestamptz(3)
+  cutoffAt          DateTime   @db.Timestamptz(3)
+  startedAt         DateTime   @default(now()) @db.Timestamptz(3)
+  finishedAt        DateTime?  @db.Timestamptz(3)
+  keywordsSearched  Int        @default(0)
+  apiRequests       Int        @default(0)
+  postsFetched      Int        @default(0)
+  postsNew          Int        @default(0)
+  postsUpdated      Int        @default(0)
+  postsDuplicate    Int        @default(0)
+  postsStale        Int        @default(0)
+  postsInvalid      Int        @default(0)
+  prefilterRejected Int        @default(0)
+  analyzed          Int        @default(0)
+  analysisPending   Int        @default(0)
+  draftsGenerated   Int        @default(0)
+  aiInputTokens     Int        @default(0)
+  aiOutputTokens    Int        @default(0)
+  errorCount        Int        @default(0)
+  error             String?
+  log               Json       @default("[]")
+
+  items DiscoveryRunItem[]
+
+  @@index([startedAt])
+  @@index([status, startedAt])
+}
+
+model DiscoveryRunItem {
+  id             String         @id @default(cuid())
+  runId          String
+  keywordId      String?
+  platform       String
+  platformPostId String
+  outcome        RunItemOutcome
+  reason         String?
+  leadId         String?
+  createdAt      DateTime       @default(now()) @db.Timestamptz(3)
+
+  run     DiscoveryRun   @relation(fields: [runId], references: [id], onDelete: Cascade)
+  keyword SearchKeyword? @relation(fields: [keywordId], references: [id], onDelete: SetNull)
+  lead    Lead?          @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@index([runId])
+  @@index([leadId])
+}
+
+// ---------------------------------------------------------------
+// Leads & CRM
+// ---------------------------------------------------------------
+
+model Lead {
+  id               String          @id @default(cuid())
+  platform         String          @default("threads")
+  platformPostId   String
+  source           LeadSource
+  shortcode        String?
+  permalink        String?
+  authorUsername   String?
+  text             String
+  contentHash      String
+  mediaType        String?
+  postedAt         DateTime?       @db.Timestamptz(3)
+  discoveredAt     DateTime        @default(now()) @db.Timestamptz(3)
+  // Payload mentah dari provider. Dapat dikosongkan oleh retensi tanpa menghapus riwayat CRM.
+  rawData          Json?
+  rawPurgedAt      DateTime?       @db.Timestamptz(3)
+  matchedKeywordId String?
+
+  // Freshness terpisah dari pipeline penjualan.
+  freshness        Freshness       @default(UNKNOWN)
+  status           LeadStatus      @default(NEW)
+
+  prefilterScore   Int             @default(0)
+  prefilterReason  String?
+  analysisStatus   AnalysisStatus  @default(PENDING)
+  analysisError    String?
+  intent           LeadIntent?
+  category         String?
+  leadScore        Int?
+  priority         LeadPriority?
+  estimatedService String?
+
+  nextFollowUpAt   DateTime?       @db.Timestamptz(3)
+  contactedAt      DateTime?       @db.Timestamptz(3)
+  lastActivityAt   DateTime        @default(now()) @db.Timestamptz(3)
+  createdAt        DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime        @updatedAt @db.Timestamptz(3)
+
+  matchedKeyword SearchKeyword?     @relation(fields: [matchedKeywordId], references: [id], onDelete: SetNull)
+  analyses       LeadAnalysis[]
+  activities     LeadActivity[]
+  notes          LeadNote[]
+  drafts         MessageDraft[]
+  runItems       DiscoveryRunItem[]
+
+  @@unique([platform, platformPostId])
+  @@index([platform, shortcode])
+  @@index([postedAt])
+  @@index([status, lastActivityAt])
+  @@index([analysisStatus])
+  @@index([leadScore])
+  @@index([discoveredAt])
+  @@index([authorUsername])
+  @@index([nextFollowUpAt])
+}
+
+model LeadAnalysis {
+  id                  String       @id @default(cuid())
+  leadId              String
+  modelVersion        String
+  promptVersion       String
+  // TRIAGE = hanya classifier kecil (prospek ditolak di tahap awal), FULL = analisis lengkap
+  stage               String       @default("FULL")
+  contentHash         String
+  isCurrent           Boolean      @default(true)
+  intent              LeadIntent
+  category            String
+  isServiceRequest    Boolean
+  confidence          Float
+  leadScore           Int
+  priority            LeadPriority
+  urgency             String
+  projectComplexity   String
+  budgetType          String
+  possibleBudget      String?
+  budgetEvidence      String?
+  estimatedService    String?
+  qualificationReason String
+  recommendedApproach String
+  redFlags            String[]
+  nextQuestion        String?
+  guardNotes          String[]
+  raw                 Json
+  inputTokens         Int          @default(0)
+  outputTokens        Int          @default(0)
+  createdAt           DateTime     @default(now()) @db.Timestamptz(3)
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId, isCurrent])
+  @@index([contentHash, promptVersion])
+}
+
+model LeadActivity {
+  id         String       @id @default(cuid())
+  leadId     String
+  type       ActivityType
+  fromStatus LeadStatus?
+  toStatus   LeadStatus?
+  message    String
+  metadata   Json?
+  actorId    String?
+  createdAt  DateTime     @default(now()) @db.Timestamptz(3)
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId, createdAt])
+  @@index([createdAt])
+}
+
+model LeadNote {
+  id        String   @id @default(cuid())
+  leadId    String
+  authorId  String?
+  body      String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  lead   Lead  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  author User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([leadId, createdAt])
+}
+
+model MessageDraft {
+  id          String    @id @default(cuid())
+  leadId      String
+  tone        DraftTone
+  isFavorite  Boolean   @default(false)
+  usedAt      DateTime? @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
+
+  lead      Lead                   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  revisions MessageDraftRevision[]
+
+  @@unique([leadId, tone])
+}
+
+model MessageDraftRevision {
+  id           String      @id @default(cuid())
+  draftId      String
+  revision     Int
+  body         String
+  source       DraftSource
+  modelVersion String?
+  issues       String[]
+  createdAt    DateTime    @default(now()) @db.Timestamptz(3)
+
+  draft MessageDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+
+  @@unique([draftId, revision])
+}
+
+// ---------------------------------------------------------------
+// Pricing
+// ---------------------------------------------------------------
+
+model Service {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  category    String
+  description String?
+  active      Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  plans PricingPlan[]
+}
+
+model PricingPlan {
+  id          String      @id @default(cuid())
+  serviceId   String
+  name        String
+  pricingType PricingType
+  // Rupiah, bilangan bulat. Null = belum ditetapkan.
+  priceMin    Int?
+  priceMax    Int?
+  currency    String      @default("IDR")
+  notes       String?
+  active      Boolean     @default(true)
+  createdAt   DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime    @updatedAt @db.Timestamptz(3)
+
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@index([serviceId, active])
+}
+
+// ---------------------------------------------------------------
+// System
+// ---------------------------------------------------------------
+
+model AppSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  updatedBy String?
+}
+
+// Append-only. Trigger database menolak UPDATE/DELETE (lihat migration audit_log_append_only).
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  entityType String?
+  entityId   String?
+  ipAddress  String?
+  metadata   Json?
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([createdAt])
+  @@index([entityType, entityId])
+}
+
+model JobLock {
+  name       String   @id
+  holderId   String
+  acquiredAt DateTime @db.Timestamptz(3)
+  expiresAt  DateTime @db.Timestamptz(3)
+}
+
+model ApiUsageLog {
+  id               String        @id @default(cuid())
+  provider         UsageProvider
+  operation        String
+  runId            String?
+  leadId           String?
+  model            String?
+  statusCode       Int?
+  success          Boolean
+  inputTokens      Int           @default(0)
+  outputTokens     Int           @default(0)
+  cacheReadTokens  Int           @default(0)
+  cacheWriteTokens Int           @default(0)
+  // Estimasi biaya dalam micro-USD (1e-6 USD) berdasarkan tabel harga di src/lib/ai/pricing.ts
+  costMicroUsd     Int           @default(0)
+  // Jumlah query yang dihitung terhadap kuota provider (Threads: hanya query dengan hasil).
+  quotaUnits       Int           @default(0)
+  durationMs       Int?
+  error            String?
+  createdAt        DateTime      @default(now()) @db.Timestamptz(3)
+
+  @@index([provider, createdAt])
+  @@index([runId])
+}
+
+// Daftar penulis yang meminta datanya dihapus. Disimpan sebagai hash SHA-256 dari
+// username yang dinormalisasi, sehingga discovery dapat melewatinya tanpa menyimpan username asli.
+model SuppressedAuthor {
+  usernameHash String   @id
+  reason       String
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+}
+
+model DataDeletionRequest {
+  id               String                @id @default(cuid())
+  confirmationCode String                @unique
+  source           DeletionRequestSource
+  status           DeletionRequestStatus @default(RECEIVED)
+  // META_CALLBACK: app-scoped user id dari signed_request
+  platformUserId   String?
+  threadsUsername  String?
+  contactEmail     String?
+  details          String?
+  resolution       String?
+  deletedLeads     Int                   @default(0)
+  ipAddress        String?
+  createdAt        DateTime              @default(now()) @db.Timestamptz(3)
+  processedAt      DateTime?             @db.Timestamptz(3)
+
+  @@index([status, createdAt])
+}

@@ -1,26 +1,145 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+  Design system Threads Lead Hunter
+  - Latar: stone hangat (#F4F3EF), bukan cream. Permukaan kerja putih.
+  - Aksen utama: pine (#1F5A4A) untuk aksi dan status "siap dihubungi".
+  - Clay (#B5482A) hanya untuk prioritas tinggi dan freshness yang hampir habis.
+  - Tipografi: Plus Jakarta Sans, angka tabular untuk data.
+  - Elevasi: datar. Bayangan hanya untuk lapisan yang melayang (menu, dialog).
+*/
+
+@theme {
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+
+  --color-canvas: #f4f3ef;
+  --color-surface: #ffffff;
+  --color-sunken: #eceae4;
+  --color-line: #e3e0d8;
+  --color-line-strong: #cfcbc0;
+
+  --color-ink: #1a1915;
+  --color-ink-2: #45423b;
+  --color-muted: #6b675e;
+  --color-faint: #8f8a7f;
+
+  --color-pine: #1f5a4a;
+  --color-pine-strong: #174536;
+  --color-pine-soft: #e3eee9;
+
+  --color-clay: #b5482a;
+  --color-clay-soft: #f6e6df;
+
+  --color-ochre: #8a5f0d;
+  --color-ochre-soft: #f4ead3;
+
+  --color-slate: #4f5b66;
+  --color-slate-soft: #e7eaed;
+
+  --color-danger: #a8321f;
+  --color-danger-soft: #f7e3df;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01" on;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection {
+    background: var(--color-pine-soft);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-pine);
+    outline-offset: 2px;
+  }
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.01em;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+    min-height: 2.25rem;
+  }
+  .btn-primary {
+    @apply bg-pine text-white hover:bg-pine-strong;
+  }
+  .btn-secondary {
+    @apply border border-line-strong bg-surface text-ink hover:bg-sunken;
+  }
+  .btn-ghost {
+    @apply text-ink-2 hover:bg-sunken;
+  }
+  .btn-danger {
+    @apply border border-danger/30 bg-surface text-danger hover:bg-danger-soft;
+  }
+  .btn-sm {
+    @apply px-2.5 py-1 text-[13px];
+    min-height: 1.875rem;
+  }
+
+  .field-label {
+    @apply mb-1.5 block text-[13px] font-medium text-ink-2;
+  }
+  .input {
+    @apply block w-full rounded-md border border-line-strong bg-surface px-3 py-2 text-sm text-ink placeholder:text-faint;
+    min-height: 2.25rem;
+  }
+  .input:focus {
+    @apply border-pine outline-none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-pine) 18%, transparent);
+  }
+  .field-hint {
+    @apply mt-1 text-xs text-muted;
+  }
+  .field-error {
+    @apply mt-1 text-xs text-danger;
+  }
+
+  .panel {
+    @apply rounded-lg border border-line bg-surface;
+  }
+
+  .link {
+    @apply text-pine underline decoration-pine/30 underline-offset-2 hover:decoration-pine;
+  }
+
+  .table-base {
+    @apply w-full border-collapse text-sm;
+  }
+  .table-base th {
+    @apply border-b border-line px-3 py-2 text-left text-xs font-medium text-muted;
+  }
+  .table-base td {
+    @apply border-b border-line px-3 py-2.5 align-top;
+  }
+  .table-base tr:last-child td {
+    @apply border-b-0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
