@@ -132,3 +132,18 @@ describe("token lifecycle", () => {
     expect(u.searchParams.get("state")).toBe("st");
   });
 });
+
+describe("toleransi jam (bug nyata: Meta menolak until > jam server mereka)", () => {
+  it("until = sekarang tidak dikirim; Meta memakai jam sendiri", async () => {
+    let called = "";
+    await keywordSearch("tok", { ...query, until: new Date() }, { fetchImpl: async (u) => ((called = u), jsonResponse({ data: [] })) });
+    expect(new URL(called).searchParams.has("until")).toBe(false);
+    expect(new URL(called).searchParams.get("since")).toBe(String(Math.floor(query.since.getTime() / 1000)));
+  });
+  it("until yang jelas di masa lalu tetap dikirim", async () => {
+    let called = "";
+    const past = new Date(Date.now() - 3600_000);
+    await keywordSearch("tok", { ...query, until: past }, { fetchImpl: async (u) => ((called = u), jsonResponse({ data: [] })) });
+    expect(new URL(called).searchParams.get("until")).toBe(String(Math.floor(past.getTime() / 1000)));
+  });
+});

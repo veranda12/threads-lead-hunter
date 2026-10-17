@@ -96,10 +96,13 @@ export async function threadsGet(
   return body;
 }
 
+/** Selisih jam yang ditoleransi: `until` dalam jendela ini dianggap "sekarang" dan tidak dikirim. */
+export const UNTIL_OMIT_WINDOW_MS = 5 * 60_000;
+
 export async function keywordSearch(
   accessToken: string,
   query: SearchQuery,
-  opts: { fetchImpl?: FetchLike; timeoutMs?: number } = {},
+  opts: { fetchImpl?: FetchLike; timeoutMs?: number; now?: () => number } = {},
 ): Promise<SearchPage> {
   const params: Record<string, string> = {
     q: query.keyword,
@@ -107,10 +110,15 @@ export async function keywordSearch(
     search_mode: "KEYWORD",
     fields: THREADS_SEARCH_FIELDS.join(","),
     since: String(Math.floor(query.since.getTime() / 1000)),
-    until: String(Math.floor(query.until.getTime() / 1000)),
     limit: String(Math.min(100, Math.max(1, query.limit))),
     access_token: accessToken,
   };
+  // `until` opsional dan defaultnya "sekarang" menurut jam Meta. Threads menolak `until` yang
+  // melewati jam server mereka, dan jam kita bisa beberapa detik lebih cepat. Jadi `until` hanya
+  // dikirim bila memang menunjuk jauh ke masa lalu.
+  if (query.until.getTime() < (opts.now?.() ?? Date.now()) - UNTIL_OMIT_WINDOW_MS) {
+    params.until = String(Math.floor(query.until.getTime() / 1000));
+  }
   if (query.cursor) params.after = query.cursor;
 
   const body = (await threadsGet(`${THREADS_API_VERSION}/keyword_search`, params, {
