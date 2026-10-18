@@ -65,6 +65,12 @@ Catatan untuk langkah 5: sebelum approval, pencarian hanya mengembalikan posting
 
 Meta biasanya meminta kredensial agar reviewer bisa membuka dashboard. Jangan berikan akun admin utama: buat akun terpisah atau ganti password sementara selama review, lalu ganti lagi setelah selesai. Cara cepat: jalankan seed dengan `ADMIN_PASSWORD` sementara dan `--reset-admin-password`, kirim kredensial itu lewat kolom khusus di form (bukan di teks deskripsi), lalu reset lagi setelah keputusan keluar.
 
+Status pengajuan 18 Okt 2026: akun reviewer terpisah `meta-reviewer@example.com` dibuat di database production (password acak, tersimpan di `.secrets/reviewer.txt`). Password admin utama tidak diberikan ke Meta.
+
+## Setelah keputusan keluar (disetujui atau ditolak)
+
+Hapus akun reviewer: hapus baris `User` dengan email `meta-reviewer@example.com` (sesinya ikut terhapus lewat relasi), lalu hapus `.secrets/reviewer.txt`.
+
 ## Setelah disetujui
 
 1. **Pengaturan → Integrasi Threads**: centang **"Meta sudah menyetujui threads_keyword_search"** lalu Simpan.
